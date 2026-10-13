@@ -1,0 +1,28 @@
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Climate data and generated models
+data/raw/
+data/processed/
+*.nc
+*.nc4
+*.grib
+*.grb
+*.pkl
+*.joblib
+
+# Editors
+.vscode/
