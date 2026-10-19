@@ -42,3 +42,6 @@ Each output contains 4,018 daily records and a 7 × 8 grid.
 - Temperature data remains on its native 1° grid; no interpolation is performed.
 - The spatial subset is a rectangular bounding box, not an exact Maharashtra state-boundary mask.
 - Temperature mask consistency has been validated against raw Tmax and Tmin data for all years from 2015 through 2025 within the selected Maharashtra bounding box.
+- `process_rainfall.py` — process daily IMD rainfall data for the Maharashtra bounding box (2015–2025), preserving missing values and the native 0.25° grid.
+- `verify_rainfall.py` — verify processed rainfall values, dates, and missingness against raw IMD data for all 11 years.
+- `check_rainfall_quality.py` — summarize rainfall missingness, negative values, and minimum/maximum values for each year.
