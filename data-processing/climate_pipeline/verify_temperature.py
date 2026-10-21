@@ -1,5 +1,7 @@
 
+
 from pathlib import Path
+import calendar
 
 import numpy as np
 import xarray as xr
@@ -14,8 +16,6 @@ CONFIGS = [
 ]
 
 MISSING_VALUE = 99.9
-
-# The output grid coordinates must match the processing script.
 LAT_START, LAT_END = 8, 15
 LON_START, LON_END = 6, 14
 
@@ -28,41 +28,60 @@ for folder, prefix, variable in CONFIGS:
         print(f"\nChecking {variable}")
 
         for year in range(2015, 2026):
-            days = 366 if __import__("calendar").isleap(year) else 365
+            days = 366 if calendar.isleap(year) else 365
             raw_path = RAW_DIR / folder / f"{prefix}{year}.GRD"
+
+            if not raw_path.exists():
+                print(f"{year}: FAIL - raw file missing")
+                all_passed = False
+                continue
 
             raw = np.fromfile(raw_path, dtype="<f4")
 
             if raw.size != days * 31 * 31:
-                print(f"{year}: FAIL — unexpected raw file size")
+                print(f"{year}: FAIL - unexpected raw file size")
                 all_passed = False
                 continue
 
             raw = raw.reshape(days, 31, 31)
-            raw_subset = raw[:, LAT_START:LAT_END, LON_START:LON_END]
+            expected = raw[:, LAT_START:LAT_END, LON_START:LON_END]
 
-            expected_mask = ~np.isclose(raw_subset, MISSING_VALUE)
+            expected_mask = (
+                np.isfinite(expected)
+                & ~np.isclose(expected, MISSING_VALUE)
+            )
+            expected = expected.astype(np.float64)
+            expected[~expected_mask] = np.nan
 
             saved = dataset.sel(time=str(year))
+            actual = saved[variable].values
             actual_mask = saved["valid_mask"].values.astype(bool)
 
-            matches = np.array_equal(expected_mask, actual_mask)
-            temperature = saved[variable].values
-
-            # Valid raw observations must be finite; missing observations must be NaN.
-            values_correct = (
-                np.isfinite(temperature[expected_mask]).all()
-                and np.isnan(temperature[~expected_mask]).all()
+            dates_ok = (
+                saved.sizes["time"] == days
+                and str(saved["time"].values[0])[:10] == f"{year}-01-01"
+                and str(saved["time"].values[-1])[:10] == f"{year}-12-31"
             )
 
-            passed = matches and values_correct
+            mask_ok = np.array_equal(expected_mask, actual_mask)
+
+            values_ok = np.allclose(
+                expected,
+                actual,
+                rtol=0,
+                atol=1e-5,
+                equal_nan=True,
+            )
+
+            passed = dates_ok and mask_ok and values_ok
             all_passed = all_passed and passed
 
             print(
                 f"{year}: {'PASS' if passed else 'FAIL'} | "
-                f"mask_match={matches} | "
-                f"raw_missing={(~expected_mask).sum()} | "
-                f"output_missing={np.isnan(temperature).sum()}"
+                f"dates={dates_ok} | mask={mask_ok} | values={values_ok}"
             )
 
 print("\nOverall result:", "PASS" if all_passed else "FAIL")
+
+if not all_passed:
+    raise SystemExit(1)

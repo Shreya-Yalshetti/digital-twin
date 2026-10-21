@@ -45,3 +45,4 @@ Each output contains 4,018 daily records and a 7 × 8 grid.
 - `process_rainfall.py` — process daily IMD rainfall data for the Maharashtra bounding box (2015–2025), preserving missing values and the native 0.25° grid.
 - `verify_rainfall.py` — verify processed rainfall values, dates, and missingness against raw IMD data for all 11 years.
 - `check_rainfall_quality.py` — summarize rainfall missingness, negative values, and minimum/maximum values for each year.
+- `verify_temperature.py` — verify temperature dates, missing-value masks, and actual Tmax/Tmin values against raw binary files for 2015–2025.
