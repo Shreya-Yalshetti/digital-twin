@@ -1,48 +1,113 @@
 # Climate Data Pipeline
 
-## Purpose
-Process IMD daily gridded rainfall and temperature data for the climate digital twin project.
+## 1. Purpose
 
-## Temperature Processing
+Process and validate India Meteorological Department (IMD) daily gridded rainfall and temperature data for the Climate Digital Twin project, using a rectangular Maharashtra-area bounding box.
 
-**Source:** India Meteorological Department (IMD)
+## 2. Data Source and Period
 
-- Tmax: `data/raw/tmax/`
-- Tmin: `data/raw/tmin/`
-- Period: 2015–2025
-- Native resolution: 1° × 1°
-- Original format: binary `.GRD` files
-- Output format: NetCDF (`.nc`)
+- Source: India Meteorological Department (IMD)
+- Period: 1 January 2015 to 31 December 2025
+- Total daily records: 4,018
+- Rainfall input directory: `data/raw/rainfall/`
+- Maximum temperature (Tmax) input directory: `data/raw/tmax/`
+- Minimum temperature (Tmin) input directory: `data/raw/tmin/`
 
-### Processing steps
-1. Read the raw binary files as little-endian float32 values.
-2. Validate that each file contains the expected number of daily grid values.
-3. Reshape the data to time, latitude and longitude dimensions.
-4. Convert the IMD missing-value marker `99.9` to `NaN`.
-5. Select the Maharashtra bounding box: latitude 15.5°–22.1°N and longitude 72.6°–80.9°E.
-6. Export the processed data and validity mask to NetCDF.
+## 3. Rainfall Processing
 
-### Outputs
+**Input format:** NetCDF (`.nc`)
+
+**Native resolution:** 0.25 degrees
+
+**Output:** `data/processed/rainfall_mm_2015_2025_maharashtra.nc`
+
+- Variable: `rainfall_mm`
+- Units: mm
+- Grid dimensions: 27 × 33
+- Selected coordinate limits: latitude 15.5°–22.1°N, longitude 72.6°–80.9°E
+
+The processing pipeline:
+1. Reads each yearly IMD rainfall file for 2015–2025.
+2. Selects the requested spatial bounding box.
+3. Renames the coordinates to `time`, `lat`, and `lon`.
+4. Preserves missing observations as missing values.
+5. Creates a `valid_mask` variable: 1 for valid observations and 0 for missing observations.
+6. Checks daily date continuity and rejects negative rainfall values.
+7. Combines the yearly data and exports the result to NetCDF.
+
+## 4. Temperature Processing
+
+**Input format:** Binary `.GRD` files
+
+**Native resolution:** 1 degree
+
+**Missing-value marker:** `99.9`, converted to `NaN`
+
+**Outputs:**
 - `data/processed/tmax_c_2015_2025.nc`
 - `data/processed/tmin_c_2015_2025.nc`
 
-Each output contains 4,018 daily records and a 7 × 8 grid.
+Each output contains 4,018 daily records on a 7 × 8 grid.
 
-## Scripts
-- `inspect_data.py` — inspect rainfall NetCDF data.
-- `validate_rainfall.py` — validate rainfall date continuity.
-- `inspect_temperature_binary.py` — inspect raw temperature binary data.
-- `process_temperature.py` — process Tmax and Tmin data.
-- `verify_temperature.py` — verify processed temperature outputs.
-- `check_mask_consistency.py` — inspect rainfall missing-cell patterns; confirm its current behavior before relying on it.
+The requested bounding-box limits are latitude 15.5°–22.1°N and longitude 72.6°–80.9°E. Because the source grid is at 1-degree resolution, the selected temperature coordinates are latitude 15.5°–21.5°N and longitude 73.5°–80.5°E.
 
-## Important Notes
-- Raw input files should remain unchanged.
+The processing pipeline:
+1. Reads the binary files as little-endian float32 values.
+2. Checks the expected number of daily grid values for each year.
+3. Reshapes the values into time, latitude, and longitude dimensions.
+4. Converts the `99.9` missing-value marker to `NaN`.
+5. Selects the available grid coordinates within the bounding-box limits.
+6. Preserves a `valid_mask` variable.
+7. Combines the yearly records and exports the results to NetCDF.
+
+No spatial interpolation is performed.
+
+## 5. Validation
+
+### Rainfall
+
+`verify_rainfall.py` checks:
+- Expected output dimensions and record count.
+- Agreement between the validity mask and rainfall missingness.
+- Date alignment against raw data for every year from 2015 through 2025.
+- Matching missing-value patterns.
+- Exact rainfall values against the raw source data.
+
+`process_rainfall.py` also checks daily date continuity and rejects negative rainfall values during processing.
+
+### Temperature
+
+`verify_temperature.py` checks:
+- Dates for each year from 2015 through 2025.
+- Missing-value masks against the raw Tmax and Tmin files.
+- Valid values and missing observations against the raw data.
+
+The latest reported temperature verification passed for all 11 years for both Tmax and Tmin.
+
+## 6. Scripts
+
+### Rainfall
+- `process_rainfall.py` — processes yearly rainfall files, checks date continuity and negative values, and exports the combined dataset.
+- `verify_rainfall.py` — compares processed rainfall values, dates, and missingness against raw files.
+- `check_rainfall_quality.py` — summarizes rainfall missingness, negative values, and minimum/maximum values by year.
+- `validate_rainfall.py` — validates rainfall date continuity; consult the script for its exact checks.
+
+### Temperature
+- `inspect_temperature_binary.py` — inspects raw temperature binary data.
+- `process_temperature.py` — processes Tmax and Tmin files.
+- `verify_temperature.py` — verifies processed temperature dates, masks, and values against raw files.
+
+### General inspection and utilities
+- `inspect_data.py` — inspects rainfall NetCDF data.
+- `check_mask_consistency.py` — inspects rainfall missing-cell patterns; consult the script for its exact checks.
+- `verify_manifest.py` — checks that the manifest is valid JSON and that the listed output files exist.
+
+## 7. Important Notes
+
+- Raw input files must remain unchanged.
 - Missing values must not be replaced with zero.
-- Temperature data remains on its native 1° grid; no interpolation is performed.
+- Rainfall and temperature retain their respective native grid resolutions.
 - The spatial subset is a rectangular bounding box, not an exact Maharashtra state-boundary mask.
-- Temperature mask consistency has been validated against raw Tmax and Tmin data for all years from 2015 through 2025 within the selected Maharashtra bounding box.
-- `process_rainfall.py` — process daily IMD rainfall data for the Maharashtra bounding box (2015–2025), preserving missing values and the native 0.25° grid.
-- `verify_rainfall.py` — verify processed rainfall values, dates, and missingness against raw IMD data for all 11 years.
-- `check_rainfall_quality.py` — summarize rainfall missingness, negative values, and minimum/maximum values for each year.
-- `verify_temperature.py` — verify temperature dates, missing-value masks, and actual Tmax/Tmin values against raw binary files for 2015–2025.
+- Temperature coordinates do not reach every requested bounding-box boundary because the native grid is 1 degree.
+- The processed historical data covers 2015–2025; it does not, by itself, provide real-time climate observations.
+- The manifest records the project period, spatial subsets, output files, and validation status.
